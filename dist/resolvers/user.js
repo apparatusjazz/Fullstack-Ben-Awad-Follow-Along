@@ -88,11 +88,23 @@ let UserResolver = class UserResolver {
             }
             const hashedPassword = yield argon2_1.default.hash(options.password);
             const user = em.create(User_1.User, { username: options.username, password: hashedPassword });
-            yield em.persistAndFlush(user);
+            try {
+                yield em.persistAndFlush(user);
+            }
+            catch (err) {
+                if (err.detail.includes('already exists')) {
+                    return {
+                        errors: [{
+                                field: 'username',
+                                message: 'username is already taken',
+                            }]
+                    };
+                }
+            }
             return { user };
         });
     }
-    login(options, { em }) {
+    login(options, { em, req }) {
         return __awaiter(this, void 0, void 0, function* () {
             const user = yield em.findOne(User_1.User, { username: options.username });
             if (!user) {
@@ -112,6 +124,7 @@ let UserResolver = class UserResolver {
                         }]
                 };
             }
+            req.session.userId = user._id;
             return { user };
         });
     }

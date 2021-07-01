@@ -54,14 +54,25 @@ export class UserResolver {
         }
         const hashedPassword = await argon2.hash(options.password)
         const user = em.create(User, { username: options.username, password: hashedPassword })
-        await em.persistAndFlush(user)
+        try {
+            await em.persistAndFlush(user)
+        } catch (err) {
+            if (err.detail.includes('already exists')) {
+                return {
+                    errors: [{
+                        field: 'username',
+                        message: 'username is already taken',
+                    }]
+                }
+            }
+        }
         return { user }
     }
 
     @Mutation(() => UserResponse)
     async login(
         @Arg('options') options: UsernamePasswordInput,
-        @Ctx() { em }: MyContext
+        @Ctx() { em, req }: MyContext
     ): Promise<UserResponse> {
         const user = await em.findOne(User, { username: options.username })
         if (!user) {
@@ -81,6 +92,9 @@ export class UserResolver {
                 }]
             }
         }
+
+        req.session.userId = user._id
+
         return { user }
     }
 }
